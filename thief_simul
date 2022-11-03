@@ -1,0 +1,87 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <conio.h>
+#include <windows.h>
+#define INF 999;
+
+int house[9];
+int road[9][9];
+
+void gotoxy(int x, int y) {
+	COORD pos;
+	pos.X = x;
+	pos.Y = y;
+	SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), pos);
+}
+
+void title() {
+	gotoxy(48, 10);
+	printf("도"); Sleep(50);
+	gotoxy(52, 10);
+	printf("둑"); Sleep(50);
+	gotoxy(42, 12);
+	printf("시"); Sleep(50);
+	gotoxy(46, 12);
+	printf("뮬"); Sleep(50);
+	gotoxy(50, 12);
+	printf("레"); Sleep(50);
+	gotoxy(54, 12);
+	printf("이"); Sleep(50);
+	gotoxy(58, 12);
+	printf("터"); Sleep(50);
+	gotoxy(50, 19);
+	printf("실행하기");
+	gotoxy(50, 21);
+	printf("종료하기");
+	while (1) {
+		if (_kbhit()) {
+			int Key = _getch();
+			switch (Key) {
+			case 119:
+				gotoxy(46, 21);
+				printf("  ");
+				gotoxy(46, 19);
+				printf("▶");
+				break;
+			case 115:
+				gotoxy(46, 19);
+				printf("  ");
+				gotoxy(46, 21);
+				printf("▶");
+				break;
+			//case 32:
+			}
+		}
+	}
+}
+
+void setRoad() {
+	srand(time(NULL));
+	for (int i = 0; i < 9; i++) {
+		for (int j = 0; j < 9; j++) {
+			road[i][j] = INF;
+			
+			if ((j - i == 3 && i <= 5) || (((i % 3) != 2) && (j - i == 1))) {
+				road[i][j] = rand() % 30 + 5;
+			}
+			if (i == j) road[i][j] = 0;
+		}
+	}
+ }
+
+void printMap() {
+	for (int i = 0; i < 3; i++) {
+		printf("(home %d)\t%d\t(home %d)\t%d\t(home %d)\n\n", i * 3, road[i * 3][i * 3 + 1], i * 3 + 1, road[i * 3 + 1][i * 3 + 2], i * 3 + 2);
+		if (i < 2) {
+			printf("%d\t\t\t%d\t\t\t%d\n\n", road[i * 3][i * 3 + 3], road[i * 3 + 1][i * 3 + 4], road[i * 3 + 2][i * 3 + 5]);
+		}
+	}
+}
+
+int main() {
+	system("mode con cols=100 lines=30");
+	title();
+	setRoad();
+	printMap();
+}
