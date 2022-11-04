@@ -10,7 +10,7 @@
 #define LEFT 2
 #define RIGHT 3
 #define SUBMIT 4
-	//방문한 집 X치기, 0번 집을 없다고 표현하기, 집 내부 표현, 골동품 방 가는 것 표현
+// 집 내부 표현, 골동품 방 가는 것 표현
 int visit[9];
 int isHouse[9][4];		// cur 위치 집에서 인접한 집의 수
 int house[9];
@@ -36,7 +36,8 @@ void printMap() {		//임시 가중치와 집이 나오는지 보는 함수, 삭�
 
 int main() {
 	system("mode con cols=100 lines=30");
-	
+	setRoad();
+	selectMap(0);
 	/*
 	setRoad();
 	for(int i = 0; i < 9; i++) {
@@ -45,6 +46,9 @@ int main() {
 		}
 		printf("\n");
 	}
+	for(int i = 0; i < 9; i++) printf("%d ", house[i]);
+	printf("\n");
+	
 	for (int i = 0; i < 9; i++) {
 		for (int j = 0; j < 4; j++) {
 			printf("%d ", isHouse[i][j]);
@@ -52,7 +56,7 @@ int main() {
 		printf("\n");
 	}
 	return 0;*/
-	
+
 	if (title() == 19) {
 		prologue();
 	}
@@ -60,13 +64,12 @@ int main() {
 		system("cls");
 		exit(0);
 	}
-	setRoad();
-	selectMap(0);
-	return 0;
 	
+	return 0;
+
 }
 
-void notcon() 
+void notcon()
 {
 	HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
 	CONSOLE_CURSOR_INFO ConsoleCursor;
@@ -139,7 +142,7 @@ int title() {
 		switch (Key) {
 		case UP:
 			if (y == 21) {
-				gotoxy(46, y );
+				gotoxy(46, y);
 				printf("  ");
 				y -= 2;
 				gotoxy(46, y);
@@ -200,7 +203,7 @@ void setRoad() {
 		}
 	}
 	for (int i = 0; i < 9; i++) {
-		for(int j = 0; j < 9; j++)
+		for (int j = 0; j < 9; j++)
 			road[j][i] = road[i][j];
 	}
 	for (int i = 0; i < 9; i++) {
@@ -229,7 +232,7 @@ void Map() {
 	printf("~~~~~~~~~~~~~");
 	gotoxy(0, 7);
 	printf("~~~~~~~~~~~~~");
-	
+
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 2; j++) {
 			gotoxy(21 + 30 * j, 6 + 7 * i);
@@ -248,17 +251,32 @@ void Map() {
 	}
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++) {
-			gotoxy(13 + 30 * i, 3 + j * 7);
-			printf(" ____");
-			gotoxy(13 + 30 * i, 4 + j * 7);
-			printf("／   ＼");
-			gotoxy(13 + 30 * i, 5 + j * 7);
-			printf("┬-----┬");
-			gotoxy(13 + 30 * i, 6 + j * 7);
-			printf("│  %d  │", 3 * j + i + 1);
-			gotoxy(13 + 30 * i, 7 + j * 7);
-			printf("└-----┘");
-		}	
+			if (!visit[j * 3 + i]) {
+				gotoxy(13 + 30 * i, 3 + j * 7);
+				printf(" ____");
+				gotoxy(13 + 30 * i, 4 + j * 7);
+				printf("／   ＼");
+				gotoxy(13 + 30 * i, 5 + j * 7);
+				printf("┬-----┬");
+				gotoxy(13 + 30 * i, 6 + j * 7);
+				printf("│  %d  │", 3 * j + i + 1);
+				gotoxy(13 + 30 * i, 7 + j * 7);
+				printf("└-----┘");
+			}
+			else {
+				gotoxy(13 + 30 * i, 3 + j * 7);
+				printf("┌------┐");
+				gotoxy(13 + 30 * i, 4 + j * 7);
+				printf("│      │");
+				gotoxy(13 + 30 * i, 5 + j * 7);
+				printf("│ 털음 │");
+				gotoxy(13 + 30 * i, 6 + j * 7);
+				printf("│      │", 3 * j + i + 1);
+				gotoxy(13 + 30 * i, 7 + j * 7);
+				printf("└------┘");
+			}
+
+		}
 	}
 	for (int i = 0; i < 3; i++) {
 		gotoxy(33, 5 + 7 * i);
@@ -307,7 +325,6 @@ void selectMap(int cur) {
 		printf("없어용");
 	}
 	else {
-		visit[cur] = 1;
 		printf("%d번 집", cur + 1);
 		switch (house[cur]) {
 		case 1:
@@ -330,7 +347,7 @@ void selectMap(int cur) {
 			printf("없어용");
 			gotoxy(90, 27);
 			printf("없어용");
-
+			break;
 		case 3:
 			gotoxy(70, 24);
 			printf("%d번 집", isHouse[cur][0] + 1);
@@ -340,7 +357,7 @@ void selectMap(int cur) {
 			printf("%d번 집", isHouse[cur][2] + 1);
 			gotoxy(90, 27);
 			printf("없어용");
-
+			break;
 		case 4:
 			gotoxy(70, 24);
 			printf("%d번 집", isHouse[cur][0] + 1);
@@ -350,6 +367,7 @@ void selectMap(int cur) {
 			printf("%d번 집", isHouse[cur][2] + 1);
 			gotoxy(90, 27);
 			printf("%d번 집", isHouse[cur][3] + 1);
+			break;
 		}
 	}
 
@@ -397,53 +415,56 @@ void selectMap(int cur) {
 			if (x == 66 && y == 24) {
 				if (visit[isHouse[cur][0]] == 1) {
 					gotoxy(50, 24);
-					printf("방문 이미 했읔");
+					printf("방문 이미 했음");
 					break;
 				}
 				if (!visit[0]) {
 					visit[0] = 1;
 					selectMap(0);
 				}
-					
+				visit[isHouse[cur][0]] = 1;
 				selectMap(isHouse[cur][0]);
 			}
 			else if (x == 86 && y == 24) {
 				if (visit[isHouse[cur][1]] == 1) {
 					gotoxy(50, 24);
-					printf("방문 이미 했읔");
+					printf("방문 이미 했음");
 					break;
 				}
 				if (isHouse[cur][1] == -1) {
 					gotoxy(50, 24);
-					printf("갈 곳이 읍서요");
+					printf("갈 곳이 없어요");
 					break;
 				}
+				visit[isHouse[cur][1]] = 1;
 				selectMap(isHouse[cur][1]);
 			}
 			else if (x == 66 && y == 27) {
 				if (visit[isHouse[cur][2]] == 1) {
 					gotoxy(50, 24);
-					printf("방문 이미 했읔");
+					printf("방문 이미 했음");
 					break;
 				}
 				if (isHouse[cur][2] == -1) {
 					gotoxy(50, 24);
-					printf("갈 곳이 읍서요");
+					printf("갈 곳이 없어요");
 					break;
 				}
+				visit[isHouse[cur][2]] = 1;
 				selectMap(isHouse[cur][2]);
 			}
 			else if (x == 86 && y == 27) {
 				if (visit[isHouse[cur][3]] == 1) {
 					gotoxy(50, 24);
-					printf("방문 이미 했읔");
+					printf("방문 이미 했음");
 					break;
 				}
 				if (isHouse[cur][3] == -1) {
 					gotoxy(50, 24);
-					printf("갈 곳이 읍서요");
+					printf("갈 곳이 없어요");
 					break;
 				}
+				visit[isHouse[cur][3]] = 1;
 				selectMap(isHouse[cur][3]);
 			}
 		}
