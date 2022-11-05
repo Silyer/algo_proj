@@ -10,11 +10,16 @@
 #define LEFT 2
 #define RIGHT 3
 #define SUBMIT 4
-// 집 내부 표현, 골동품 방 가는 것 표현
+// 가방 표시할 것, 집 들어가서 상호작용 완성할 
+// 금은방 함수 추가, 갇히는 엔딩 추가, 훔칠 물건 추가, 들키는 엔딩 추가, 집 내부 표현중..
 int visit[9];
+int vinum = 0;
 int isHouse[9][4];		// cur 위치 집에서 인접한 집의 수
 int house[9];
 int road[9][9];
+int room[9][5];		// 0 = 보석, 1 = 백금, 2 = 금, 3 = 은, 4 = 철
+int bag[5];
+int weight;
 
 void notcon(); // 키보드 깜빡이는거 없애기
 void gotoxy(int x, int y); // 이동
@@ -24,6 +29,12 @@ void prologue();
 void setRoad(); // 길 가중치 정하기
 void Map();
 void selectMap(int cur);	// 갈 집 고르기
+int isDiscovered();	// 훔치다 들켰다면?
+
+void enterHouse(int cur);
+void endRoom();
+void stuck();
+void discovered();
 
 void printMap() {		//임시 가중치와 집이 나오는지 보는 함수, 삭제 요망
 	for (int i = 0; i < 3; i++) {
@@ -36,7 +47,8 @@ void printMap() {		//임시 가중치와 집이 나오는지 보는 함수, 삭�
 
 int main() {
 	system("mode con cols=100 lines=30");
-	
+	setRoad();
+	selectMap(0);
 	/*
 	setRoad();
 	for(int i = 0; i < 9; i++) {
@@ -63,8 +75,7 @@ int main() {
 		system("cls");
 		exit(0);
 	}
-	setRoad();
-	selectMap(0);
+	
 	return 0;
 }
 
@@ -190,8 +201,9 @@ void prologue() {
 }
 
 void setRoad() {
+	weight = 100;
 	srand((unsigned)time(NULL));
-	for (int i = 0; i < 9; i++) {
+	for (int i = 0; i < 9; i++) {		// 집 간의 거리 구성
 		for (int j = 0; j < 9; j++) {
 			road[i][j] = INF;
 
@@ -220,6 +232,25 @@ void setRoad() {
 				house[i]++;
 				isHouse[i][t++] = j;
 			}
+		}
+	}
+	house[8]++;
+	isHouse[8][2] = 9;
+	for (int i = 0; i < 9; i++) {
+		for (int j = 0; j < 5; j++) {
+			room[i][j] = 0;
+		}
+	}
+
+	for (int i = 0; i < 9; i++) {		// 집 안의 내용물 구성
+		int howmany = rand() % 10 + 5;	//집에 물건 몇개? -> 5 ~ 15
+		for (int j = 0; j < howmany; j++) {
+			int item = rand() % 100;
+			if (0 <= item && item < 3) room[i][0]++;		//다이아
+			else if (3 <= item && item < 20) room[i][1]++;	//백금
+			else if (20 <= item && item < 40) room[i][2]++;	//금
+			else if (40 <= item && item < 65) room[i][3]++;	//은
+			else room[i][4]++;								//철
 		}
 	}
 }
@@ -268,9 +299,9 @@ void Map() {
 				gotoxy(13 + 30 * i, 4 + j * 7);
 				printf("│      │");
 				gotoxy(13 + 30 * i, 5 + j * 7);
-				printf("│ 털음 │");
+				printf("│ %d번  │", 3 * j + i + 1);
 				gotoxy(13 + 30 * i, 6 + j * 7);
-				printf("│      │", 3 * j + i + 1);
+				printf("│털음^^│");
 				gotoxy(13 + 30 * i, 7 + j * 7);
 				printf("└------┘");
 			}
@@ -298,7 +329,7 @@ void Map() {
 	gotoxy(86, 19);
 	printf("┌-------┐");
 	gotoxy(86, 20);
-	printf("│골동품 │\n");
+	printf("│금은방 │\n");
 	gotoxy(86, 21);
 	printf("└-------┘\n");
 	gotoxy(0, 23);
@@ -307,7 +338,17 @@ void Map() {
 
 void selectMap(int cur) {
 	system("cls");
+	int isCon = 0;
+	for (int i = 0; i < house[cur]; i++) {
+		if (visit[isHouse[cur][i]] == 1)
+			isCon++;
+	}
+	if (isCon == house[cur]) stuck();	// 해당 집에서 더 이상 갈 곳 없으면 ㅈㅈ
 	Map();
+	if (vinum >= 5) {		// 5번 이상 방문 시 들킬 위험 생김
+		gotoxy(73, 1);
+		printf("동이 텄다.. 슬슬 가야 해");
+	}
 	gotoxy(0, 24);
 	printf("털고 싶은 집을 선택해주세요");
 	gotoxy(0, 27);
@@ -353,7 +394,10 @@ void selectMap(int cur) {
 			gotoxy(90, 24);
 			printf("%d번 집", isHouse[cur][1] + 1);
 			gotoxy(70, 27);
-			printf("%d번 집", isHouse[cur][2] + 1);
+			if (cur == 8) {
+				printf("금은방");
+			}
+			else printf("%d번 집", isHouse[cur][2] + 1);
 			gotoxy(90, 27);
 			printf("없어용");
 			break;
@@ -436,9 +480,11 @@ void selectMap(int cur) {
 					break;
 				}
 				if (!visit[0]) {
+					enterHouse(0);
 					visit[0] = 1;
 					selectMap(0);
 				}
+				enterHouse(isHouse[cur][0]);
 				visit[isHouse[cur][0]] = 1;
 				selectMap(isHouse[cur][0]);
 			}
@@ -453,6 +499,7 @@ void selectMap(int cur) {
 					printf("갈 곳이 없어요");
 					break;
 				}
+				enterHouse(isHouse[cur][1]);
 				visit[isHouse[cur][1]] = 1;
 				selectMap(isHouse[cur][1]);
 			}
@@ -467,8 +514,12 @@ void selectMap(int cur) {
 					printf("갈 곳이 없어요");
 					break;
 				}
-				visit[isHouse[cur][2]] = 1;
-				selectMap(isHouse[cur][2]);
+				if (isHouse[cur][2] > 8) endRoom();
+				else {
+					enterHouse(isHouse[cur][2]);
+					visit[isHouse[cur][2]] = 1;
+					selectMap(isHouse[cur][2]);
+				}
 			}
 			else if (x == 86 && y == 27) {
 				if (visit[isHouse[cur][3]] == 1) {
@@ -481,9 +532,202 @@ void selectMap(int cur) {
 					printf("갈 곳이 없어요");
 					break;
 				}
+				enterHouse(isHouse[cur][3]);
 				visit[isHouse[cur][3]] = 1;
 				selectMap(isHouse[cur][3]);
 			}
 		}
 	}
+}
+
+int isDiscovered() {
+	srand((unsigned)time(NULL));
+	int n = rand() % vinum;
+	if (vinum > 5) n += vinum - 5;
+	if (n > 5) return 1;
+	else return 0;
+}
+
+void enterHouse(int cur) {
+	system("cls");
+	vinum++;
+	if (isDiscovered()) discovered();
+	gotoxy(23, 10);
+	printf("다이아몬드 %d개, 백금 %d개, 금 %d개, 은 %d개, 철 %d개가 있다!", room[cur][0], room[cur][1], room[cur][2], room[cur][3], room[cur][4]);
+	Sleep(2000);
+	gotoxy(40, 14);
+	printf("무엇을 훔쳐갈까?");
+	gotoxy(0, 23);
+	printf("---------------------------------------------------------------------------------------------------");
+	gotoxy(50, 24);
+	printf("다이아몬드");
+	gotoxy(70, 24);
+	printf("백금");
+	gotoxy(90, 24);
+	printf("금");
+	gotoxy(50, 27);
+	printf("은");
+	gotoxy(70, 27);
+	printf("철");
+	gotoxy(90, 27);
+	printf("나가기");
+	int x = 46, y = 24, steal = 0;
+	gotoxy(x, y);
+	printf("▶");
+	while (1) {
+		int Key = keycontrol();
+		switch (Key) {
+		case UP:
+			if (y == 27) {
+				gotoxy(x, y);
+				printf("  ");
+				y -= 3;
+				gotoxy(x, y);
+				printf("▶");
+			}
+			else if (y == 24) {
+				gotoxy(x, y);
+				printf("▶");
+			}
+			break;
+		case DOWN:
+			if (y == 24) {
+				gotoxy(x, y);
+				printf("  ");
+				y += 3;
+				gotoxy(x, y);
+				printf("▶");
+			}
+			else if (y == 27) {
+				gotoxy(x, y);
+				printf("▶");
+			}
+			break;
+		case LEFT:
+			if (x == 86 || x == 66) {
+				gotoxy(x, y);
+				printf("  ");
+				x -= 20;
+				gotoxy(x, y);
+				printf("▶");
+			}
+			else if (x == 46) {
+				gotoxy(x, y);
+				printf("▶");
+			}
+			break;
+		case RIGHT:
+			if (x == 66 || x == 46) {
+				gotoxy(x, y);
+				printf("  ");
+				x += 20;
+				gotoxy(x, y);
+				printf("▶");
+			}
+			else if (x == 86) {
+				gotoxy(x, y);
+				printf("▶");
+			}
+			break;
+		case SUBMIT:
+			if (x == 46 && y == 24) {
+				gotoxy(1, 27);
+				printf("                         ");
+				gotoxy(1, 27);
+				if (room[cur][0] <= 0) {
+					printf("다야가 없어요ㅠ");
+					break;
+				}
+				else {
+					printf("몇 개 훔쳐갈까? : ");
+					scanf_s("%d", &steal);
+					if (steal > room[cur][0]) {
+						gotoxy(1, 27);
+						printf("이 집에 그만큼 많지 않다..");
+						break;
+					}
+					else {
+						gotoxy(1, 27);
+						printf("                   ");
+						gotoxy(1, 27);
+						printf("훔쳐갔다.");
+						break;
+					}
+				}
+			}
+			else if (x == 66 && y == 24) {
+				if (room[cur][1] <= 0) {
+					gotoxy(1, 27);
+					printf("백금이 없어요ㅠ");
+					break;
+				}
+			}
+			else if (x == 86 && y == 24) {
+				if (room[cur][2] <= 0) {
+					gotoxy(1, 27);
+					printf("금이 없어요ㅠㅠ");
+					break;
+				}
+			}
+			else if (x == 46 && y == 27) {
+				if (room[cur][3] <= 0) {
+					gotoxy(1, 27);
+					printf("은이 없어요ㅠㅠ");
+					break;
+				}
+			}
+			else if (x == 66 && y == 27) {
+				if (room[cur][3] <= 0) {
+					gotoxy(1, 27);
+					printf("철이 없어요ㅠㅠ");
+					break;
+				}
+			}
+			else if (x == 86 && y == 27) {
+				
+			}
+		}
+		gotoxy(1, 24);
+		printf("                          ");
+		gotoxy(1, 24);
+		if (x == 46 && y == 24) {
+			printf("다이아몬드 무게 1, 가치 10");
+		}
+		else if (x == 66 && y == 24) {
+			printf("백금 무게 3, 가치 5");
+		}
+		else if (x == 86 && y == 24) {
+			printf("금 무게 5, 가치 7");
+		}
+		else if (x == 46 && y == 27) {
+			printf("은 무게 7, 가치 2");
+		}
+		else if (x == 66 && y == 27) {
+			printf("철 무게 10, 가치 3");
+		}
+		else if (x == 86 && y == 27) {
+			printf("나가기 버튼");
+		}
+	}
+}
+
+void endRoom() {
+	system("cls");
+	gotoxy(50, 10);
+	printf("끝났다!");
+	exit(0);
+}
+
+void stuck() {
+	system("cls");
+	gotoxy(50, 10);
+	printf("갇혔다!");
+	exit(0);
+}
+
+void discovered() {
+	system("cls");
+	gotoxy(50, 10);
+	printf("들켰다!");
+	exit(0);
 }
