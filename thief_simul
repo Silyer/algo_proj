@@ -10,8 +10,8 @@
 #define LEFT 2
 #define RIGHT 3
 #define SUBMIT 4
-// 가방 표시할 것, 집 들어가서 상호작용 완성할 
-// 금은방 함수 추가, 갇히는 엔딩 추가, 훔칠 물건 추가, 들키는 엔딩 추가, 집 내부 표현중, 가방 무게, 가방 터지는 엔딩 추가
+#define INVEN 5
+// 금은방 함수 추가, 갇히는 엔딩 추가, 훔칠 물건 추가, 들키는 엔딩 추가, 집 내부 표현중, 가방 무게, 가방 터지는 엔딩 추가, 가방 구현
 int visit[9];		// 해당 집에 방문을 했는지?
 int vinum = 0;		// 집들을 몇 번 방문했는지?
 int isHouse[9][4];		// cur 위치 집에서 인접한 집들이 각 몇 번째 집인지?
@@ -29,6 +29,7 @@ void prologue();	// 프롤로그 씬
 void setting(); // 게임 구성 함수
 void Map();		// 맵 씬
 void selectMap(int cur);	// 현재 위치(cur)에서 갈 집 고르기
+void showBag(int cur);
 int isDiscovered();	// 훔치다 들켰다면? 1:0
 
 void enterHouse(int cur);	// 집 들어가면 나오는 화면
@@ -39,7 +40,8 @@ void bagBurst();	// 가방의 무게를 초과해서 가방 터지는 엔딩
 
 int main() {
 	system("mode con cols=100 lines=30");	// 콘솔창 크기 구성
-	
+	setting();
+	selectMap(0);
 	if (title() == 19) {
 		prologue();
 	}
@@ -47,8 +49,7 @@ int main() {
 		system("cls");
 		exit(0);
 	}
-	setting();
-	selectMap(0);
+	
 	return 0;
 }
 
@@ -92,7 +93,10 @@ int keycontrol()
 	{
 		return SUBMIT;
 	}
-
+	else if (temp == 'e' || temp == 'E')
+	{
+		return INVEN;
+	}
 }
 
 int title() {
@@ -269,7 +273,7 @@ void selectMap(int cur) {
 	if (vinum >= 5) {		// 5번 이상 방문 시 들킬 위험 생김
 		gotoxy(73, 1); printf("동이 텄다.. 슬슬 가야 해");
 	}
-	gotoxy(0, 24); printf("털고 싶은 집을 선택해주세요");
+	gotoxy(0, 24); printf("털고 싶은 집을 선택해주세요	E : 가방");
 	gotoxy(0, 27); printf("현재 위치 : ");
 	if (!visit[0]) {
 		printf("아지트");
@@ -415,8 +419,59 @@ void selectMap(int cur) {
 				visit[isHouse[cur][3]] = 1;
 				selectMap(isHouse[cur][3]);
 			}
+		case INVEN:
+			showBag(cur);
 		}
+
 	}
+}
+
+void showBag(int cur) {
+	system("cls");
+	for (int i = 0; i < 3; i++) {
+		gotoxy(36, 1 + 8 * i); printf("┌-------------------------┐");
+		gotoxy(36, 2 + 8 * i); printf("│                         │");
+		gotoxy(36, 3 + 8 * i); printf("│                         │");
+		gotoxy(36, 4 + 8 * i); printf("│                         │");
+		gotoxy(36, 5 + 8 * i); printf("│                         │");
+		gotoxy(36, 6 + 8 * i); printf("│                         │");
+		gotoxy(36, 7 + 8 * i); printf("│                         │");
+		gotoxy(36, 8 + 8 * i); printf("└-------------------------┘");
+	}
+
+	gotoxy(8, 9); printf("┌-------------------------┐");
+	gotoxy(8, 10); printf("│                         │");
+	gotoxy(8, 11); printf("│                         │");
+	gotoxy(8, 12); printf("│                         │");
+	gotoxy(8, 13); printf("│                         │");
+	gotoxy(8, 14); printf("│                         │");
+	gotoxy(8, 15); printf("│                         │");
+	gotoxy(8, 16); printf("└-------------------------┘");
+
+	gotoxy(64, 9); printf("┌-------------------------┐");
+	gotoxy(64, 10); printf("│                         │");
+	gotoxy(64, 11); printf("│                         │");
+	gotoxy(64, 12); printf("│                         │");
+	gotoxy(64, 13); printf("│                         │");
+	gotoxy(64, 14); printf("│                         │");
+	gotoxy(64, 15); printf("│                         │");
+	gotoxy(64, 16); printf("└-------------------------┘");
+	gotoxy(8, 2); printf("가방");
+	gotoxy(8, 4); printf("남은 가방 무게 : %d", weight);
+	gotoxy(74, 25); printf("E를 눌러 맵으로");
+	gotoxy(45, 3); printf("다이아몬드");
+	gotoxy(20, 11); printf("백금");
+	gotoxy(49, 11); printf("금");
+	gotoxy(77, 11); printf("은");
+	gotoxy(49, 19); printf("철");
+
+	gotoxy(49, 5); printf("%d개", bag[0]);
+	gotoxy(21, 13); printf("%d개", bag[1]);
+	gotoxy(49, 13); printf("%d개", bag[2]);
+	gotoxy(77, 13); printf("%d개", bag[3]);
+	gotoxy(49, 21); printf("%d개", bag[4]);
+	int Key = keycontrol();
+	if (Key == INVEN) selectMap(cur);
 }
 
 int isDiscovered() {
@@ -507,7 +562,7 @@ void enterHouse(int cur) {
 						break;
 					}
 					else {
-						bag[0]++;
+						bag[0] += steal;
 						weight -= 1 * steal;
 						room[cur][0] -= steal;
 						gotoxy(1, 27); printf("                   ");
@@ -531,10 +586,10 @@ void enterHouse(int cur) {
 						break;
 					}
 					else {
-						bag[1]++;
+						bag[1] += steal;
 						weight -= 3 * steal;
 						room[cur][1] -= steal;
-						gotoxy(1, 27) ;printf("                   ");
+						gotoxy(1, 27); printf("                   ");
 						gotoxy(1, 27); printf("백금 %d개를 훔쳤다!", steal);
 						gotoxy(23, 10); printf("다이아몬드 %d개, 백금 %d개, 금 %d개, 은 %d개, 철 %d개가 있다!", room[cur][0], room[cur][1], room[cur][2], room[cur][3], room[cur][4]);
 						break;
@@ -555,7 +610,7 @@ void enterHouse(int cur) {
 						break;
 					}
 					else {
-						bag[2]++;
+						bag[2] += steal;
 						weight -= 5 * steal;
 						room[cur][2] -= steal;
 						gotoxy(1, 27); printf("                   ");
@@ -579,7 +634,7 @@ void enterHouse(int cur) {
 						break;
 					}
 					else {
-						bag[3]++;
+						bag[3] += steal;
 						weight -= 7;
 						room[cur][3] -= steal;
 						gotoxy(1, 27); printf("                   ");
@@ -603,7 +658,7 @@ void enterHouse(int cur) {
 						break;
 					}
 					else {
-						bag[4]++;
+						bag[4] += steal;
 						weight -= 10 * steal;
 						room[cur][4] -= steal;
 						gotoxy(1, 27); printf("                   ");
