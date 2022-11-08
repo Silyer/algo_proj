@@ -20,6 +20,8 @@ int road[9][9];		// road[i][j]면 i에서 j까지의 도로 가중치를 나타�
 int room[9][5];		// 0 = 보석, 1 = 백금, 2 = 금, 3 = 은, 4 = 철
 int bag[5];		// 가방 배열, 인덱스는 room의 배열과 같음
 int weight;		// 가방 무게
+int worth = 0;	// 총 훔친 물건의 가치
+int dist = 0;	// 총 다녀온 길의 가중치
 
 void notcon(); // 키보드 깜빡이는거 없애기
 void gotoxy(int x, int y); // 이동
@@ -29,8 +31,10 @@ void prologue();	// 프롤로그 씬
 void setting(); // 게임 구성 함수
 void Map();		// 맵 씬
 void selectMap(int cur);	// 현재 위치(cur)에서 갈 집 고르기
-void showBag(int cur);
+void showBag(int cur);	// 가방 보여주는 함수
 int isDiscovered();	// 훔치다 들켰다면? 1:0
+int minDistance(int* d, int* v);
+void dijkstra();
 
 void enterHouse(int cur);	// 집 들어가면 나오는 화면
 void endRoom();		// 금은방 들가면 나오는 엔딩
@@ -40,8 +44,7 @@ void bagBurst();	// 가방의 무게를 초과해서 가방 터지는 엔딩
 
 int main() {
 	system("mode con cols=100 lines=30");	// 콘솔창 크기 구성
-	setting();
-	selectMap(0);
+	
 	if (title() == 19) {
 		prologue();
 	}
@@ -49,7 +52,8 @@ int main() {
 		system("cls");
 		exit(0);
 	}
-	
+	setting();
+	selectMap(0);
 	return 0;
 }
 
@@ -139,13 +143,12 @@ int title() {
 
 void prologue() {
 	system("cls");
-	gotoxy(30, 5); printf("나는 도둑이다."); Sleep(500);
-	gotoxy(45, 5); printf("나는 도둑치곤 똑똑하다."); Sleep(1000);
+	gotoxy(30, 5); printf("나는 도둑이다.");
+	gotoxy(45, 5); printf("나는 도둑치곤 똑똑하다.");
 	gotoxy(32, 8); printf("효율을 굉장히 잘 따지기 때문이다."); Sleep(1000);
-	gotoxy(33, 11); printf("그렇기에 가는 루트도 "); Sleep(200);
-	gotoxy(55, 11); printf("최선"); Sleep(500); gotoxy(59, 11); printf("으로,"); Sleep(1000);
-	gotoxy(34, 14); printf("훔치는 물건도"); Sleep(300); gotoxy(48, 14); printf("최대한"); Sleep(600); gotoxy(55, 14); printf("적으면서"); Sleep(300);
-	gotoxy(34, 17); printf("가치가"); Sleep(300); gotoxy(41, 17); printf("높은"); Sleep(600); gotoxy(46, 17); printf("것만 털어갈 거다."); Sleep(300);
+	gotoxy(33, 11); printf("그렇기에 가는 루트도 최선으로,"); Sleep(1000);
+	gotoxy(34, 14); printf("훔치는 물건도 최대한 적으면서");  Sleep(1000);
+	gotoxy(34, 17); printf("가치가 높은 것만 털어갈 거다."); Sleep(1000);
 	gotoxy(19, 20); printf("과연 나는 얼마나 효율적으로 집을 방문하고 털어갈 수 있을까?"); Sleep(1500);
 	gotoxy(67, 29); printf("계속 하려면 아무 키나 누르시오..");
 	_getch();
@@ -375,6 +378,7 @@ void selectMap(int cur) {
 				}
 				enterHouse(isHouse[cur][0]);
 				visit[isHouse[cur][0]] = 1;
+				dist += road[cur][isHouse[cur][0]];
 				selectMap(isHouse[cur][0]);
 			}
 			else if (x == 86 && y == 24) {
@@ -388,6 +392,7 @@ void selectMap(int cur) {
 				}
 				enterHouse(isHouse[cur][1]);
 				visit[isHouse[cur][1]] = 1;
+				dist += road[cur][isHouse[cur][1]];
 				selectMap(isHouse[cur][1]);
 			}
 			else if (x == 66 && y == 27) {
@@ -403,6 +408,7 @@ void selectMap(int cur) {
 				else {
 					enterHouse(isHouse[cur][2]);
 					visit[isHouse[cur][2]] = 1;
+					dist += road[cur][isHouse[cur][2]];
 					selectMap(isHouse[cur][2]);
 				}
 			}
@@ -417,6 +423,7 @@ void selectMap(int cur) {
 				}
 				enterHouse(isHouse[cur][3]);
 				visit[isHouse[cur][3]] = 1;
+				dist += road[cur][isHouse[cur][3]];
 				selectMap(isHouse[cur][3]);
 			}
 		case INVEN:
@@ -482,12 +489,47 @@ int isDiscovered() {
 	else return 0;
 }
 
+int minDistance(int* d, int* v) {
+	int min = INF;
+	int min_i = 0;
+
+	for (int i = 0; i < 9; i++) {
+		if (!v[i] && min > d[i]) {
+			min_i = i;
+			min = d[i];
+		}
+	}
+	return min_i;
+}
+
+void dijkstra() {
+	int mindist[9];		// 해당 정점의 최단 거리 파악
+	int vidi[9];	// 해당 함수에서 방문 체크하는 배열
+	for (int i = 0; i < 9; i++) {
+		mindist[i] = INF;
+		vidi[i] = 0;
+	}
+	mindist[0] = 0;
+
+	for (int i = 0; i < 8; i++) {
+		int u = minDistance(mindist, vidi);
+		for (int j = 0; j < 9; j++) {
+			if (!vidi[i] && road[u][i] && mindist[u] != 999 && mindist[i] > mindist[u] + road[u][i])
+				mindist[i] = mindist[u] + road[u][i];
+		}
+		vidi[u] = 1;
+
+	}
+	for (int i = 0; i < 9; i++)
+		printf("%d \t\t %d\n", i, mindist[i]);
+}
+
 void enterHouse(int cur) {
 	system("cls");
 	vinum++;
 	if (isDiscovered()) discovered();
 	gotoxy(23, 10); printf("다이아몬드 %d개, 백금 %d개, 금 %d개, 은 %d개, 철 %d개가 있다!", room[cur][0], room[cur][1], room[cur][2], room[cur][3], room[cur][4]);
-	Sleep(2000);
+	Sleep(500);
 	gotoxy(40, 14); printf("무엇을 훔쳐갈까?");
 	gotoxy(0, 19); printf("------------------------┐");
 	gotoxy(24, 20); printf("│");
@@ -699,10 +741,12 @@ void enterHouse(int cur) {
 }
 
 void endRoom() {
-	int worth = bag[0] * 10 + bag[1] * 5 + bag[2] * 7 + bag[3] * 2 + bag[4] * 3;
+	worth = bag[0] * 10 + bag[1] * 5 + bag[2] * 7 + bag[3] * 2 + bag[4] * 3;
 	system("cls");
 	gotoxy(50, 10); printf("끝났다!");
 	gotoxy(50, 13); printf("가치 : %d", worth);
+	gotoxy(50, 16); printf("거리 : %d", dist);
+	gotoxy(1, 17); dijkstra();
 	exit(0);
 }
 
