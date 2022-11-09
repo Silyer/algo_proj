@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -11,17 +10,28 @@
 #define RIGHT 3
 #define SUBMIT 4
 #define INVEN 5
-// 금은방 함수 추가, 갇히는 엔딩 추가, 훔칠 물건 추가, 들키는 엔딩 추가, 집 내부 표현중, 가방 무게, 가방 터지는 엔딩 추가, 가방 구현
+#define MAX(x, y) x > y ? x : y
+//컷씬만 이제 잘 보정하면 끝날듯
 int visit[9];		// 해당 집에 방문을 했는지?
 int vinum = 0;		// 집들을 몇 번 방문했는지?
 int isHouse[9][4];		// cur 위치 집에서 인접한 집들이 각 몇 번째 집인지?
 int house[9];			// cur 위치 집에서 인접한 집의 수
 int road[9][9];		// road[i][j]면 i에서 j까지의 도로 가중치를 나타낸 배열
 int room[9][5];		// 0 = 보석, 1 = 백금, 2 = 금, 3 = 은, 4 = 철
+int itemweight[5] = { 2, 3, 4, 5, 6 };		// 각 아이템의 무게
+int itemvalue[5] = { 10, 6, 8, 12, 13 };	// 각 아이템의 가치
 int bag[5];		// 가방 배열, 인덱스는 room의 배열과 같음
 int weight;		// 가방 무게
 int worth = 0;	// 총 훔친 물건의 가치
 int dist = 0;	// 총 다녀온 길의 가중치
+
+int d[100][100];	// 배낭 알고리즘에 쓰이는 dp 배열
+int maxworth;	// 최소 경로에서 얻을 수 있는 최대의 가치
+int mindist;	// 최소 경로 가중치
+int path[9][9];	// 최소 거리를 구하기 위한 경로 배열
+int minpath[9];	// 최소 경로 추적 배열, 보기용(1번째 집 = 0)으로 되어있으므로 실제 배열에 넣을 때 -1 할 것
+int minpIndex;	// minpath index, 최소 경로가 몇 곳을 다녀왔는지
+int minpitem[5];	// 최소 경로에서 빼올 수 있는 모든 아이템들
 
 void notcon(); // 키보드 깜빡이는거 없애기
 void gotoxy(int x, int y); // 이동
@@ -33,18 +43,29 @@ void Map();		// 맵 씬
 void selectMap(int cur);	// 현재 위치(cur)에서 갈 집 고르기
 void showBag(int cur);	// 가방 보여주는 함수
 int isDiscovered();	// 훔치다 들켰다면? 1:0
-int minDistance(int* d, int* v);
-void dijkstra();
+void knapSack();
+void floyd();	// 최소 경로 추적 함수
+void printPath(int (*path)[9], int s, int e);	// 추적한 경로를 기록하는 함수
+char setRankD();	// 가치에 따른 랭크 표기
+char setRankD();	// 거리에 따른 랭크 표기
 
 void enterHouse(int cur);	// 집 들어가면 나오는 화면
 void endRoom();		// 금은방 들가면 나오는 엔딩
+int endRank();
 void stuck();		// 현재 집에서 갈 집이 없을 때 나오는 엔딩
 void discovered();	// 집 들어갔는데 집주인에게 들키는 엔딩
 void bagBurst();	// 가방의 무게를 초과해서 가방 터지는 엔딩
 
+void SScene();
+void AScene();
+void BScene();
+void CScene();
+void DScene();
+void FScene();
+
 int main() {
 	system("mode con cols=100 lines=30");	// 콘솔창 크기 구성
-	
+
 	if (title() == 19) {
 		prologue();
 	}
@@ -53,7 +74,9 @@ int main() {
 		exit(0);
 	}
 	setting();
+	Map();
 	selectMap(0);
+
 	return 0;
 }
 
@@ -149,7 +172,7 @@ void prologue() {
 	gotoxy(33, 11); printf("그렇기에 가는 루트도 최선으로,"); Sleep(1000);
 	gotoxy(34, 14); printf("훔치는 물건도 최대한 적으면서");  Sleep(1000);
 	gotoxy(34, 17); printf("가치가 높은 것만 털어갈 거다."); Sleep(1000);
-	gotoxy(19, 20); printf("과연 나는 얼마나 효율적으로 집을 방문하고 털어갈 수 있을까?"); Sleep(1500);
+	gotoxy(19, 20); printf("과연 나는 얼마나 효율적으로 집을 방문하고 털어갈 수 있을까?"); Sleep(1000);
 	gotoxy(67, 29); printf("계속 하려면 아무 키나 누르시오..");
 	_getch();
 	system("cls");
@@ -157,18 +180,19 @@ void prologue() {
 }
 
 void setting() {		// 게임 구성 함수
-	weight = 50;	// 초기 가방 무게 구성
 	srand((unsigned)time(NULL));
+	weight = rand() % 50 + 50;	// 초기 가방 무게 구성
 	for (int i = 0; i < 9; i++) {		// 집 간의 거리(가중치) 구성
 		for (int j = 0; j < 9; j++) {
 			road[i][j] = INF;
-
+			path[i][j] = -1;
 			if ((j - i == 3 && i <= 5) || (((i % 3) != 2) && (j - i == 1))) {
 				road[i][j] = rand() % 30 + 5;
 			}
 			if (i == j) road[i][j] = 0;
 		}
 	}
+
 	for (int i = 0; i < 9; i++) {	// 양방향 그래프 구성
 		for (int j = 0; j < 9; j++)
 			road[j][i] = road[i][j];
@@ -199,16 +223,30 @@ void setting() {		// 게임 구성 함수
 	}
 
 	for (int i = 0; i < 9; i++) {		// 각 집 안의 내용물 구성
-		int howmany = rand() % 10 + 5;	// 집에 물건 몇개? -> 5 ~ 15
+		int howmany = rand() % 10 + 7;	// 집에 물건 몇개? -> 7 ~ 17
 		for (int j = 0; j < howmany; j++) {
 			int item = rand() % 100;
 			if (0 <= item && item < 5) room[i][0]++;		//다이아
-			else if (5 <= item && item < 20) room[i][1]++;	//백금
-			else if (20 <= item && item < 40) room[i][2]++;	//금
-			else if (40 <= item && item < 65) room[i][3]++;	//은
+			else if (5 <= item && item < 25) room[i][1]++;	//백금
+			else if (25 <= item && item < 50) room[i][2]++;	//금
+			else if (50 <= item && item < 75) room[i][3]++;	//은
 			else room[i][4]++;								//철
 		}
 	}
+
+	minpIndex = 1;
+	minpath[0] = 1;
+	for (int i = 1; i < 9; i++) minpath[i] = -1;
+	for (int i = 0; i < 5; i++) minpitem[i] = 0;
+	floyd();
+	printPath(path, 1, 9);
+	minpath[minpIndex++] = 9;
+	for (int i = 0; i < minpIndex; i++) {
+		for (int j = 0; j < 5; j++) {
+			minpitem[j] += room[minpath[i] - 1][j];
+		}
+	}
+	knapSack();
 }
 
 void Map() {
@@ -489,39 +527,85 @@ int isDiscovered() {
 	else return 0;
 }
 
-int minDistance(int* d, int* v) {
-	int min = INF;
-	int min_i = 0;
+void knapSack() {
+	int sum = 0, t = 0;		//sum = 최소 경로에 훔칠 수 있는 물건 총 개수, t = tem 인덱스
+	for (int i = 0; i < 5; i++) {
+		sum += minpitem[i];
+	}
+	int tem[100][2];	//tem[n][0] = 무게, tem[n][1] = 가치, n = 최소 경로에 훔칠 수 있는 물건
 
-	for (int i = 0; i < 9; i++) {
-		if (!v[i] && min > d[i]) {
-			min_i = i;
-			min = d[i];
+	for (int i = 0; i < 5; i++) {
+		for (int j = 0; j < minpitem[i]; j++) {
+			tem[t][0] = itemweight[i];
+			tem[t][1] = itemvalue[i];
+			t++;
 		}
 	}
-	return min_i;
+	int v = 0, w = weight;
+
+	for (int i = 1; i <= sum; i++) {
+		for (int j = 1; j <= w; j++) {
+			int wi = tem[i - 1][0];
+			int vi = tem[i - 1][1];
+
+			if (wi > j) {
+				d[i][j] = d[i - 1][j];
+			}
+			else {
+				d[i][j] = MAX(d[i - 1][j], vi + d[i - 1][j - wi]);
+			}
+		}
+	}
+	maxworth = d[sum][w];
 }
 
-void dijkstra() {
-	int mindist[9];		// 해당 정점의 최단 거리 파악
-	int vidi[9];	// 해당 함수에서 방문 체크하는 배열
+void floyd() {
+	int d[9][9];
 	for (int i = 0; i < 9; i++) {
-		mindist[i] = INF;
-		vidi[i] = 0;
+		for (int j = 0; j < 9; j++)
+			d[i][j] = road[i][j];
 	}
-	mindist[0] = 0;
 
-	for (int i = 0; i < 8; i++) {
-		int u = minDistance(mindist, vidi);
-		for (int j = 0; j < 9; j++) {
-			if (!vidi[i] && road[u][i] && mindist[u] != 999 && mindist[i] > mindist[u] + road[u][i])
-				mindist[i] = mindist[u] + road[u][i];
+	for (int k = 0; k < 9; k++) {
+		for (int i = 0; i < 9; i++) {
+			for (int j = 0; j < 9; j++) {
+				if (d[i][k] + d[k][j] < d[i][j]) {
+					path[i][j] = k + 1;
+					d[i][j] = d[i][k] + d[k][j];
+				}
+			}
 		}
-		vidi[u] = 1;
-
 	}
-	for (int i = 0; i < 9; i++)
-		printf("%d \t\t %d\n", i, mindist[i]);
+	mindist = d[0][8];
+}
+
+void printPath(int(*path)[9], int s, int e) {
+	if (path[s - 1][e - 1] != -1) {
+		printPath(path, s, path[s - 1][e - 1]);
+		//printf("%2d->", path[s - 1][e - 1]);
+		minpath[minpIndex++] = path[s - 1][e - 1];
+		printPath(path, path[s - 1][e - 1], e);
+	}
+}
+
+char setRankW() {
+	int perW = (int)(((double)worth / (double)maxworth) * 100);
+	if (perW >= 100) return 'S';
+	else if (perW >= 80) return 'A';
+	else if (perW >= 70) return 'B';
+	else if (perW >= 60) return 'C';
+	else if (perW >= 50) return 'D';
+	else return 'F';
+}
+
+char setRankD() {
+	int perD = (int)(((double)mindist / (double)dist) * 100);
+	if (perD >= 100) return 'S';
+	else if (perD >= 90) return 'A';
+	else if (perD >= 80) return 'B';
+	else if (perD >= 70) return 'C';
+	else if (perD >= 60) return 'D';
+	else return 'F';
 }
 
 void enterHouse(int cur) {
@@ -529,8 +613,7 @@ void enterHouse(int cur) {
 	vinum++;
 	if (isDiscovered()) discovered();
 	gotoxy(23, 10); printf("다이아몬드 %d개, 백금 %d개, 금 %d개, 은 %d개, 철 %d개가 있다!", room[cur][0], room[cur][1], room[cur][2], room[cur][3], room[cur][4]);
-	Sleep(500);
-	gotoxy(40, 14); printf("무엇을 훔쳐갈까?");
+	gotoxy(40, 14); printf("무엇을 훔쳐갈까?"); Sleep(500);
 	gotoxy(0, 19); printf("------------------------┐");
 	gotoxy(24, 20); printf("│");
 	gotoxy(24, 21); printf("│");
@@ -605,7 +688,7 @@ void enterHouse(int cur) {
 					}
 					else {
 						bag[0] += steal;
-						weight -= 1 * steal;
+						weight -= itemweight[0] * steal;
 						room[cur][0] -= steal;
 						gotoxy(1, 27); printf("                   ");
 						gotoxy(1, 27); printf("다이아 %d개를 훔쳤다!", steal);
@@ -629,7 +712,7 @@ void enterHouse(int cur) {
 					}
 					else {
 						bag[1] += steal;
-						weight -= 3 * steal;
+						weight -= itemweight[1] * steal;
 						room[cur][1] -= steal;
 						gotoxy(1, 27); printf("                   ");
 						gotoxy(1, 27); printf("백금 %d개를 훔쳤다!", steal);
@@ -653,7 +736,7 @@ void enterHouse(int cur) {
 					}
 					else {
 						bag[2] += steal;
-						weight -= 5 * steal;
+						weight -= itemweight[2] * steal;
 						room[cur][2] -= steal;
 						gotoxy(1, 27); printf("                   ");
 						gotoxy(1, 27); printf("금 %d개를 훔쳤다!", steal);
@@ -677,7 +760,7 @@ void enterHouse(int cur) {
 					}
 					else {
 						bag[3] += steal;
-						weight -= 7;
+						weight -= itemweight[3] * steal;
 						room[cur][3] -= steal;
 						gotoxy(1, 27); printf("                   ");
 						gotoxy(1, 27); printf("은 %d개를 훔쳤다!", steal);
@@ -701,7 +784,7 @@ void enterHouse(int cur) {
 					}
 					else {
 						bag[4] += steal;
-						weight -= 10 * steal;
+						weight -= itemweight[4] * steal;
 						room[cur][4] -= steal;
 						gotoxy(1, 27); printf("                   ");
 						gotoxy(1, 27); printf("철 %d개를 훔쳤다!", steal);
@@ -717,19 +800,19 @@ void enterHouse(int cur) {
 		gotoxy(1, 24); printf("                          ");
 		gotoxy(1, 24);
 		if (x == 46 && y == 24) {
-			printf("다이아몬드 무게 1, 가치 10");
+			printf("다이아몬드 무게 %d, 가치 %d", itemweight[0], itemvalue[0]);
 		}
 		else if (x == 66 && y == 24) {
-			printf("백금 무게 3, 가치 5");
+			printf("백금 무게 %d, 가치 %d", itemweight[1], itemvalue[1]);
 		}
 		else if (x == 86 && y == 24) {
-			printf("금 무게 5, 가치 7");
+			printf("금 무게 %d, 가치 %d", itemweight[2], itemvalue[2]);
 		}
 		else if (x == 46 && y == 27) {
-			printf("은 무게 7, 가치 2");
+			printf("은 무게 %d, 가치 %d", itemweight[3], itemvalue[3]);
 		}
 		else if (x == 66 && y == 27) {
-			printf("철 무게 10, 가치 3");
+			printf("철 무게 %d, 가치 %d", itemweight[4], itemvalue[4]);
 		}
 		else if (x == 86 && y == 27) {
 			printf("나가기 버튼");
@@ -741,32 +824,201 @@ void enterHouse(int cur) {
 }
 
 void endRoom() {
-	worth = bag[0] * 10 + bag[1] * 5 + bag[2] * 7 + bag[3] * 2 + bag[4] * 3;
+	for (int i = 0; i < 5; i++) {
+		worth += bag[i] * itemvalue[i];
+	}
+	
 	system("cls");
-	gotoxy(50, 10); printf("끝났다!");
-	gotoxy(50, 13); printf("가치 : %d", worth);
-	gotoxy(50, 16); printf("거리 : %d", dist);
-	gotoxy(1, 17); dijkstra();
+	gotoxy(2, 5); printf("벌어 온 가치 : %d\t『 %c 』", worth, setRankW()); Sleep(1000);
+	gotoxy(2, 8); printf("다녀 온 거리 : %d\t『 %c 』", dist, setRankD()); Sleep(1000);
+
+	if (endRank() != 1) {
+		gotoxy(2, 21); printf("나는 ");
+		for (int i = 0; i < minpIndex; i++) {
+			if(i != minpIndex - 1) printf("%2d번-> ", minpath[i]);
+			else printf("%2d번", minpath[i]);
+		}
+		printf("에 가서");
+		gotoxy(2, 23); printf("시간을 %d만 쓸 수 있었고", mindist);
+		gotoxy(2, 25); printf("%d 만큼 벌 수 있었다..ㅠ", maxworth);
+	}
+	else {
+		gotoxy(2, 21); printf("나는 세계 최고의 도둑이다. ㄹㅇ");
+	}
+	gotoxy(1, 27);
 	exit(0);
+}
+
+int endRank() {
+	char wRank = setRankW(), dRank = setRankD();
+	int wScore = 0, dScore = 0, score = 0;
+	if (wRank == 'S') wScore = 50;
+	else if (wRank == 'A') wScore = 40;
+	else if (wRank == 'B') wScore = 30;
+	else if (wRank == 'C') wScore = 20;
+	else if (wRank == 'D') wScore = 10;
+	else if (wRank == 'F') wScore = 0;
+	if (dRank == 'S') dScore = 50;
+	else if (dRank == 'A') dScore = 40;
+	else if (dRank == 'B') dScore = 30;
+	else if (dRank == 'C') dScore = 20;
+	else if (dRank == 'D') dScore = 10;
+	else if (dRank == 'F') dScore = 0;
+
+	score = wScore + dScore;
+	if (score == 100) {
+		SScene();
+		return 1;
+	}
+	else if (score >= 80) {
+		AScene();
+		return 2;
+	}
+	else if (score >= 60) {
+		BScene();
+		return 3;
+	}
+	else if (score >= 30) {
+		CScene();
+		return 4;
+	}
+	else if (score >= 10) {
+		DScene();
+		return 5;
+	}
+	else {
+		FScene();
+		return 6;
+	}
 }
 
 void stuck() {
 	system("cls");
-	gotoxy(50, 10);
-	printf("갇혔다!");
+	gotoxy(40, 10); printf("아이고 꼼짝없이 갇혔다!"); gotoxy(0, 29);
 	exit(0);
 }
 
 void discovered() {
 	system("cls");
-	gotoxy(50, 10);
-	printf("들켰다!");
+	gotoxy(38, 10); printf("아이고 집주인에게 들켰다!"); gotoxy(0, 29);
 	exit(0);
 }
 
 void bagBurst() {
 	system("cls");
-	gotoxy(50, 10);
-	printf("터졌다!");
+	gotoxy(40, 10); printf("아이고 가방이 터졌다!"); gotoxy(0, 29);
 	exit(0);
+}
+
+void SScene() {
+	gotoxy(60, 6);  printf("      *******");
+	gotoxy(60, 7);  printf("    *       ***");
+	gotoxy(60, 8);  printf("   *         **");
+	gotoxy(60, 9);  printf("   **        *");
+	gotoxy(60, 10); printf("    ***");
+	gotoxy(60, 11); printf("   ** ***");
+	gotoxy(60, 12); printf("    *** ***");
+	gotoxy(60, 13); printf("      *** ***");
+	gotoxy(60, 14); printf("        *** ***");
+	gotoxy(60, 15); printf("          ** ***");
+	gotoxy(60, 16); printf("           ** **");
+	gotoxy(60, 17); printf("            * *");
+	gotoxy(60, 18); printf("  ***        *");
+	gotoxy(60, 19); printf(" *  *********");
+	gotoxy(60, 20); printf("*     ***** ");
+	gotoxy(60, 20); printf("*");
+	gotoxy(60, 20); printf(" **");
+}
+void AScene() {
+	gotoxy(60, 6);  printf("        **");
+	gotoxy(60, 7);  printf("     *****");
+	gotoxy(60, 8);  printf("    *  ***");
+	gotoxy(60, 9);  printf("       ***");
+	gotoxy(60, 10); printf("      *  **");
+	gotoxy(60, 11); printf("      *  **");
+	gotoxy(60, 12); printf("     *    ** ");
+	gotoxy(60, 13); printf("     *    ** ");
+	gotoxy(60, 14); printf("    *      **");
+	gotoxy(60, 15); printf("    *********");
+	gotoxy(60, 16); printf("   *        **");
+	gotoxy(60, 17); printf("   *        **");
+	gotoxy(60, 18); printf("  *****      **");
+	gotoxy(60, 19); printf(" *   ****    ** *");
+	gotoxy(60, 20); printf("*     **      **");
+	gotoxy(60, 20); printf("*");
+	gotoxy(60, 20); printf(" **");
+}
+void BScene() {
+	gotoxy(60, 6);  printf("     ***** **");
+	gotoxy(60, 7);  printf("  ******  ***");
+	gotoxy(60, 8);  printf(" **   *  * **");
+	gotoxy(60, 9);  printf("*    *  *  **");
+	gotoxy(60, 10); printf("    *  *   *");
+	gotoxy(60, 11); printf("   ** **  *");
+	gotoxy(60, 12); printf("   ** ** * ");
+	gotoxy(60, 13); printf("   ** ***");
+	gotoxy(60, 14); printf("   ** ** ***");
+	gotoxy(60, 15); printf("   ** **   ***");
+	gotoxy(60, 16); printf("   *  **     **");
+	gotoxy(60, 17); printf("      *      **");
+	gotoxy(60, 18); printf("  ****     ***");
+	gotoxy(60, 19); printf(" *  ********");
+	gotoxy(60, 20); printf("*     ****");
+	gotoxy(60, 20); printf("*");
+	gotoxy(60, 20); printf(" **");
+}
+void CScene() {
+	gotoxy(60, 6);  printf("      * ***");
+	gotoxy(60, 7);  printf("    *  ****  *");
+	gotoxy(60, 8);  printf("   *  *  ****");
+	gotoxy(60, 9);  printf("  *  **   **");
+	gotoxy(60, 10); printf(" *  ***");
+	gotoxy(60, 11); printf("**   **");
+	gotoxy(60, 12); printf("**   **");
+	gotoxy(60, 13); printf("**   **");
+	gotoxy(60, 14); printf("**   **");
+	gotoxy(60, 15); printf("**   **");
+	gotoxy(60, 16); printf(" **  **");
+	gotoxy(60, 17); printf("  ** *      *");
+	gotoxy(60, 18); printf("   ***     *");
+	gotoxy(60, 19); printf("    ******");
+	gotoxy(60, 20); printf("      ***");
+}
+void DScene() {
+	gotoxy(60, 6);  printf("      ***** **");
+	gotoxy(60, 7);  printf("   ******  ***");
+	gotoxy(60, 8);  printf(" **    *  * ***");
+	gotoxy(60, 9);  printf("*     *  *   ***");
+	gotoxy(60, 10); printf("     *  *     ***");
+	gotoxy(60, 11); printf("    ** **      **");
+	gotoxy(60, 12); printf("    ** **      **");
+	gotoxy(60, 13); printf("    ** **      **");
+	gotoxy(60, 14); printf("    ** **      **");
+	gotoxy(60, 15); printf("    ** **      **");
+	gotoxy(60, 16); printf("    *  **      **");
+	gotoxy(60, 17); printf("       *       *");
+	gotoxy(60, 18); printf("  *****       *");
+	gotoxy(60, 19); printf(" *   *********");
+	gotoxy(60, 20); printf("*       ****");
+	gotoxy(60, 20); printf("*");
+	gotoxy(60, 20); printf(" **");
+}
+void FScene() {
+	gotoxy(60, 6);  printf("     ***** **");
+	gotoxy(60, 7);  printf("  ******  **** *");
+	gotoxy(60, 8);  printf(" **   *  *  ***");
+	gotoxy(60, 9);  printf("*    *  *    * ");
+	gotoxy(60, 10); printf("    *  *");
+	gotoxy(60, 11); printf("   ** **");
+	gotoxy(60, 12); printf("   ** **");
+	gotoxy(60, 13); printf("   ** ****** ");
+	gotoxy(60, 14); printf("   ** *****");
+	gotoxy(60, 15); printf("   ** **");
+	gotoxy(60, 16); printf("   *  **");
+	gotoxy(60, 17); printf("      *");
+	gotoxy(60, 18); printf("  *****");
+	gotoxy(60, 19); printf(" *  *****");
+	gotoxy(60, 20); printf("*    ***");
+	gotoxy(60, 20); printf("*");
+	gotoxy(60, 20); printf(" **");
 }
